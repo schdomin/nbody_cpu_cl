@@ -8,50 +8,56 @@ namespace NBody
 //ds ctor/dtor
 //ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps
 CCubicDomain::CCubicDomain( const std::pair< double, double >& p_pairBoundaries,
-                            const unsigned int& p_uNumberOfParticles ): m_arrParticles( 0 ),
-                                                                        m_pairBoundaries( p_pairBoundaries ),
-                                                                        m_dDomainSize( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
-                                                                        m_uNumberOfParticles( p_uNumberOfParticles ),
-                                                                        m_strParticleInformation( "" ),
-                                                                        m_strIntegralsInformation( "" )
+                            const unsigned int& p_uNumberOfParticles,
+                            const double& p_dMinimumDistance ): m_pairBoundaries( p_pairBoundaries ),
+                                                                m_dDomainSize( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
+                                                                m_uNumberOfParticles( p_uNumberOfParticles ),
+                                                                m_uNumberOfCells( floor( m_dDomainSize/(2.5*p_dMinimumDistance ) ) ),
+                                                                m_strParticleInformation( "" ),
+                                                                m_strIntegralsInformation( "" )
 {
-    //ds nothing to do
+    //ds initialize vector
+    m_vecParticles.clear( );
+    m_vecParticles.reserve( m_uNumberOfParticles );
 }
 
 //ds default destructor
 CCubicDomain::~CCubicDomain( )
 {
-    //ds deallocate memory
-    delete[] m_arrParticles;
+    //ds clear vector
+    m_vecParticles.clear( );
 }
 
 //ds accessors
 void CCubicDomain::createParticlesUniformFromNormalDistribution( const double& p_dTargetKineticEnergy, const double& p_dParticleMass )
 {
-    //ds allocate an array for the new particles
-    m_arrParticles = new CParticle[m_uNumberOfParticles];
-
     //ds kinetic energy to derive from initial situation
     double dKineticEnergy( 0.0 );
 
     //ds set particle information for each
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
+        //ds get a particle instance
+        CParticle cParticle( u );
+
         //ds set the particle mass (same for all particles in this case)
-        m_arrParticles[u].m_dMass = p_dParticleMass;
+        cParticle.m_dMass = p_dParticleMass;
 
         //ds set the position: uniformly distributed between boundaries in this case
-        m_arrParticles[u].m_cPosition = NBody::CVector( _getUniformlyDistributedNumber( ),
+        cParticle.m_cPosition = NBody::CVector( _getUniformlyDistributedNumber( ),
                                                         _getUniformlyDistributedNumber( ),
                                                         _getUniformlyDistributedNumber( ) );
 
         //ds set velocity values: from normal distribution
-        m_arrParticles[u].m_cVelocity = NBody::CVector( _getNormallyDistributedNumber( ) ,
+        cParticle.m_cVelocity = NBody::CVector( _getNormallyDistributedNumber( ) ,
                                                         _getNormallyDistributedNumber( ) ,
                                                         _getNormallyDistributedNumber( ) );
 
         //ds add the resulting kinetic component (needed below)
-        dKineticEnergy += m_arrParticles[u].m_dMass/2*pow( NBody::CVector::absoluteValue( m_arrParticles[u].m_cVelocity ), 2 );
+        dKineticEnergy += cParticle.m_dMass/2*pow( NBody::CVector::absoluteValue( cParticle.m_cVelocity ), 2 );
+
+        //ds add it to the vector
+        m_vecParticles.push_back( cParticle );
     }
 
     //ds calculate the rescaling factor
@@ -61,13 +67,20 @@ void CCubicDomain::createParticlesUniformFromNormalDistribution( const double& p
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds rescale the velocity component
-        m_arrParticles[u].m_cVelocity *= dRescalingFactor;
+        m_vecParticles[u].m_cVelocity *= dRescalingFactor;
+    }
+
+    //ds construct cell data
+    for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
+    {
+        //ds set the cell index of the current particle
+        m_vecParticles[u].m_uIndexCell = _getCellIndex( m_vecParticles[u] );
     }
 }
 
 void CCubicDomain::updateParticlesVelocityVerlet( const double& p_dTimeStep, const double& p_dMinimumDistance, const double& p_dPotentialDepth )
 {
-    //ds allocate a temporary array to hold the accelerations
+    /*ds allocate a temporary array to hold the accelerations
     CVector *arrNewAccelerations = new CVector[m_uNumberOfParticles];
 
     //ds for each particle
@@ -123,12 +136,12 @@ void CCubicDomain::updateParticlesVelocityVerlet( const double& p_dTimeStep, con
     }
 
     //ds deallocate the temporary accelerations array
-    delete[] arrNewAccelerations;
+    delete[] arrNewAccelerations;*/
 }
 
 void CCubicDomain::saveParticlesToStream( )
 {
-    //ds format: X Y Z U V W
+    /*ds format: X Y Z U V W
 
     //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
@@ -143,12 +156,12 @@ void CCubicDomain::saveParticlesToStream( )
         //ds append the buffer to our string
         m_strParticleInformation += chBuffer;
         m_strParticleInformation += "\n";
-    }
+    }*/
 }
 
 void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, const double& p_dPotentialDepth )
 {
-    //ds format: E X Y Z X Y Z X Y Z
+    /*ds format: E X Y Z X Y Z X Y Z
 
     //ds get information - caution, memory gets allocated
     const NBody::CVector vecCenterOfMass    ( getCenterOfMass( ) );
@@ -166,12 +179,12 @@ void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, cons
 
     //ds append the buffer to our string
     m_strIntegralsInformation += chBuffer;
-    m_strIntegralsInformation += "\n";
+    m_strIntegralsInformation += "\n";*/
 }
 
 void CCubicDomain::writeParticlesToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps )
 {
-    //ds ofstream object
+    /*ds ofstream object
     std::ofstream ofsFile;
 
     //ds open the file for writing
@@ -185,12 +198,12 @@ void CCubicDomain::writeParticlesToFile( const std::string& p_strFilename, const
     }
 
     //ds close the file
-    ofsFile.close( );
+    ofsFile.close( );*/
 }
 
 void CCubicDomain::writeIntegralsToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps, const double& p_dTimeStepSize )
 {
-    //ds ofstream object
+    /*ds ofstream object
     std::ofstream ofsFile;
 
     //ds open the file for writing
@@ -204,7 +217,7 @@ void CCubicDomain::writeIntegralsToFile( const std::string& p_strFilename, const
     }
 
     //ds close the file
-    ofsFile.close( );
+    ofsFile.close( );*/
 }
 
 //ds accessors/helpers
@@ -213,7 +226,7 @@ double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const dou
     //ds total energy to accumulate
     double dTotalEnergy( 0.0 );
 
-    //ds for each particle
+    /*ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the kinetic component
@@ -226,7 +239,7 @@ double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const dou
             //ds add the potential component
             dTotalEnergy += _getLennardJonesPotential( m_arrParticles[u], m_arrParticles[v], p_dMinimumDistance, p_dPotentialDepth );
         }
-    }
+    }*/
 
     return dTotalEnergy;
 }
@@ -236,7 +249,7 @@ CVector CCubicDomain::getCenterOfMass( ) const
     //ds center to find
     CVector cCenter;
 
-    //ds total mass
+    /*ds total mass
     double dMassTotal( 0.0 );
 
     //ds for each particle
@@ -250,7 +263,7 @@ CVector CCubicDomain::getCenterOfMass( ) const
     }
 
     //ds divide by total mass
-    cCenter /= dMassTotal;
+    cCenter /= dMassTotal;*/
 
     return cCenter;
 }
@@ -260,12 +273,12 @@ CVector CCubicDomain::getAngularMomentum( ) const
     //ds momentum
     CVector cMomentum;
 
-    //ds for each particle
+    /*ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the current momentum
         cMomentum += NBody::CVector::crossProduct( m_arrParticles[u].m_cPosition, m_arrParticles[u].m_dMass*m_arrParticles[u].m_cVelocity );
-    }
+    }*/
 
     return cMomentum;
 }
@@ -275,12 +288,12 @@ CVector CCubicDomain::getLinearMomentum( ) const
     //ds momentum
     CVector cMomentum;
 
-    //ds for each particle
+    /*ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the current momentum
         cMomentum += m_arrParticles[u].m_dMass*m_arrParticles[u].m_cVelocity;
-    }
+    }*/
 
     return cMomentum;
 }
@@ -342,6 +355,14 @@ double CCubicDomain::_getNormallyDistributedNumber( ) const
 
     //ds return the normal one
     return sqrt( -2*log( dUniformNumber ) )*cos( 2*M_PI*dUniformNumber );
+}
+
+unsigned int CCubicDomain::_getCellIndex( const CParticle& p_CParticle ) const
+{
+    //ds calculate the cell index and return it
+    return floor( ( p_CParticle.m_cPosition( 0 ) + m_dDomainSize/2 )/2*m_uNumberOfCells
+                                                 +( p_CParticle.m_cPosition( 1 ) + m_dDomainSize/2 )/2*m_uNumberOfCells*m_uNumberOfCells
+                                                 +( p_CParticle.m_cPosition( 2 ) + m_dDomainSize/2 )/2*m_uNumberOfCells*m_uNumberOfCells*m_uNumberOfCells );
 }
 
 } //ds namespace NBody

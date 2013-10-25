@@ -13,20 +13,20 @@ int main( int argc, char** argv )
     const std::pair< double, double > pairBoundaries( -1.0, 1.0 );
     const unsigned int uNumberOfParticles( 100 );
 
+    //ds current simulation configuration
+    const double dTimeStepSize( 0.0001 );
+    const unsigned int uNumberOfTimeSteps( 5000 );
+    const double dMinimumDistance( 5/uNumberOfParticles ); //pow( 1.0/uNumberOfParticles, 1.0/3 ) ); <- causes massive accelerations
+    const double dPotentialDepth( 0.01 );
+
     //ds allocate a domain to work with specifying number of particles and timing
-    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles );
+    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance );
 
     //ds target kinetic energy
     const double dTargetKineticEnergy( 1000.0 );
 
     //ds create particles uniformly from a normal distribution
     cDomain.createParticlesUniformFromNormalDistribution( dTargetKineticEnergy );
-
-    //ds current simulation configuration
-    const double dTimeStepSize( 0.0001 );
-    const unsigned int uNumberOfTimeSteps( 5000 );
-    const double dMinimumDistance( 5/uNumberOfParticles ); //pow( 1.0/uNumberOfParticles, 1.0/3 ) ); <- causes massive accelerations
-    const double dPotentialDepth( 0.01 );
 
     std::cout << "--------CPU SETUP------------------------------------------------------------" << std::endl;
     std::cout << "  Number of particles: " << uNumberOfParticles << std::endl;

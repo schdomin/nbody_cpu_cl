@@ -7,7 +7,7 @@ CFLAGS = -c -Wall
 #ds default field
 all: main
 
-	$(CC) bin/CVector.o bin/CCubicDomain.o bin/main.o -o bin/nbody_cpu
+	$(CC) bin/CVector.o bin/CCubicDomain.o bin/main.o -o bin/nbody_cpu_cl
 
 #ds object files
 main:

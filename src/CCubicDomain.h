@@ -1,8 +1,9 @@
 #ifndef CCUBICDOMAIN_H_
 #define CCUBICDOMAIN_H_
 
-#include "CVector.h"               //ds basic structure for 3d information
-#include <stdlib.h>                //ds labs, drand48
+#include "CVector.h" //ds basic structure for 3d information
+#include <stdlib.h>  //ds labs, drand48
+#include <vector>    //ds vectors for sorting
 
 
 
@@ -17,7 +18,9 @@ class CCubicDomain
 public:
 
     //ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps
-    CCubicDomain( const std::pair< double, double >& p_pairBoundaries, const unsigned int& p_uNumberOfParticles );
+    CCubicDomain( const std::pair< double, double >& p_pairBoundaries,
+                  const unsigned int& p_uNumberOfParticles,
+                  const double& p_dMinimumDistance );
 
     //ds default destructor
     ~CCubicDomain( );
@@ -28,6 +31,9 @@ private:
     //ds inherent structure for particle information
     struct CParticle
     {
+        //ds fix the particle index at construction
+        CParticle( const unsigned int& p_uIndexParticle ): m_uIndexParticle( p_uIndexParticle ){ };
+
         //ds constant properties
         double m_dMass;
 
@@ -36,12 +42,21 @@ private:
         NBody::CVector m_cVelocity;
         NBody::CVector m_cAcceleration;
 
-    } *m_arrParticles;
+        //ds indexi
+        unsigned int m_uIndexParticle; //<- should be const, but because we're using vectors it has to remain changeable (copy ctor of vector, etc)
+        unsigned int m_uIndexCell;
+    };
+
+    //ds particle storage (contains cell id and particle id)
+    std::vector< CParticle > m_vecParticles;
 
     //ds domain properties
     const std::pair< double, double > m_pairBoundaries;
     const double m_dDomainSize;
     const unsigned int m_uNumberOfParticles;
+
+    //ds cell list properties
+    const unsigned int m_uNumberOfCells;
 
     //ds streams for offline data - needed for the movie and graphs
     std::string m_strParticleInformation;
@@ -72,6 +87,7 @@ private:
     CVector _getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
     double _getUniformlyDistributedNumber( ) const;
     double _getNormallyDistributedNumber( ) const;
+    unsigned int _getCellIndex( const CParticle& p_CParticle ) const;
 
 };
 
