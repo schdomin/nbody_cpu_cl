@@ -1,24 +1,35 @@
 #include "CCubicDomain.h"
+#include <algorithm>      //ds std::sort
 
 
 
 namespace NBody
 {
 
-//ds ctor/dtor
+//ds ctor/dtor - ugly ctor required for the const attributes
 //ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps
 CCubicDomain::CCubicDomain( const std::pair< double, double >& p_pairBoundaries,
                             const unsigned int& p_uNumberOfParticles,
-                            const double& p_dMinimumDistance ): m_pairBoundaries( p_pairBoundaries ),
-                                                                m_dDomainSize( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
-                                                                m_uNumberOfParticles( p_uNumberOfParticles ),
-                                                                m_uNumberOfCells( floor( m_dDomainSize/(2.5*p_dMinimumDistance ) ) ),
-                                                                m_strParticleInformation( "" ),
-                                                                m_strIntegralsInformation( "" )
+                            const double& p_dMinimumDistance,
+                            const unsigned int& p_uNumberOfCells,
+                            const unsigned int& p_uMaximumCellIndex ): m_pairBoundaries( p_pairBoundaries ),
+                                                                       m_dDomainSize( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
+                                                                       m_uNumberOfParticles( p_uNumberOfParticles ),
+                                                                       m_uNumberOfCells( p_uNumberOfCells ),
+                                                                       m_uMaximumCellIndex( p_uMaximumCellIndex ),
+                                                                       m_uMaximumNeighborCellIndexRange( _getCellIndex( m_pairBoundaries.second, m_pairBoundaries.second, m_pairBoundaries.second )
+                                                                                                        - _getCellIndex( ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
+                                                                                                                         ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
+                                                                                                                         ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ) ) ),
+                                                                       m_strParticleInformation( "" ),
+                                                                       m_strIntegralsInformation( "" )
 {
     //ds initialize vector
     m_vecParticles.clear( );
     m_vecParticles.reserve( m_uNumberOfParticles );
+
+    //ds initialize support structure - pairs are initialized with 0,0 by default
+    m_arrCellIndexRange = new std::pair< unsigned int, unsigned int >[m_uMaximumCellIndex];
 }
 
 //ds default destructor
@@ -26,6 +37,9 @@ CCubicDomain::~CCubicDomain( )
 {
     //ds clear vector
     m_vecParticles.clear( );
+
+    //ds deallocated memory
+    delete[] m_arrCellIndexRange;
 }
 
 //ds accessors
@@ -45,13 +59,13 @@ void CCubicDomain::createParticlesUniformFromNormalDistribution( const double& p
 
         //ds set the position: uniformly distributed between boundaries in this case
         cParticle.m_cPosition = NBody::CVector( _getUniformlyDistributedNumber( ),
-                                                        _getUniformlyDistributedNumber( ),
-                                                        _getUniformlyDistributedNumber( ) );
+                                                _getUniformlyDistributedNumber( ),
+                                                _getUniformlyDistributedNumber( ) );
 
         //ds set velocity values: from normal distribution
         cParticle.m_cVelocity = NBody::CVector( _getNormallyDistributedNumber( ) ,
-                                                        _getNormallyDistributedNumber( ) ,
-                                                        _getNormallyDistributedNumber( ) );
+                                                _getNormallyDistributedNumber( ) ,
+                                                _getNormallyDistributedNumber( ) );
 
         //ds add the resulting kinetic component (needed below)
         dKineticEnergy += cParticle.m_dMass/2*pow( NBody::CVector::absoluteValue( cParticle.m_cVelocity ), 2 );
@@ -70,78 +84,100 @@ void CCubicDomain::createParticlesUniformFromNormalDistribution( const double& p
         m_vecParticles[u].m_cVelocity *= dRescalingFactor;
     }
 
-    //ds construct cell data
-    for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
-    {
-        //ds set the cell index of the current particle
-        m_vecParticles[u].m_uIndexCell = _getCellIndex( m_vecParticles[u] );
-    }
+    //ds construct cell lists
+    _updateCellList( );
 }
 
 void CCubicDomain::updateParticlesVelocityVerlet( const double& p_dTimeStep, const double& p_dMinimumDistance, const double& p_dPotentialDepth )
 {
-    /*ds allocate a temporary array to hold the accelerations
+    //ds allocate a temporary array to hold the accelerations
     CVector *arrNewAccelerations = new CVector[m_uNumberOfParticles];
 
-    //ds for each particle
-    for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
+    //ds for each cell id (dangerous games with possible unsigned integer overflows here to avoid tons of if cases and worse readability)
+    for( unsigned int u = 0; u < m_uMaximumCellIndex; ++u )
     {
-        //ds sum of forces acting on the particle
-        CVector cTotalForce;
-
-        //ds loop over all other particles
-        for( unsigned int v = 0; v < m_uNumberOfParticles; ++v )
+        //ds handle the current cell particles - this only works because the data is ordered also in cell order (indexing is shifted by 1, [0,0] means there is no particle in the cell)
+        for( unsigned int v = m_arrCellIndexRange[u].first; v < m_arrCellIndexRange[u].second; ++v )
         {
-            //ds if its not the same particle
-            if( u != v )
+            //ds for each particle in this cell
+            for( int i = static_cast< int >( u-m_uMaximumNeighborCellIndexRange ); i < static_cast< int >( u+m_uMaximumNeighborCellIndexRange+1 ); ++i )
             {
-                //ds collect the force from the current particle and add it (the function takes care of periodic boundary condition)
-                cTotalForce += _getLennardJonesForce( m_arrParticles[u], m_arrParticles[v], p_dMinimumDistance, p_dPotentialDepth );
+                //ds force to sum up
+                CVector cTotalForce;
+
+                //ds internal "real" index
+                unsigned int uNeighborCellIndex( 0 );
+
+                //ds check for periodic boundary conditions
+                if( i < 0 )
+                {
+                    //ds shift up by maximum cell index
+                    uNeighborCellIndex += m_uMaximumCellIndex;
+                }
+                else if( i > static_cast< int >( m_uMaximumCellIndex ) )
+                {
+                    //ds shift down by maximum cell index
+                    uNeighborCellIndex -= m_uMaximumCellIndex;
+                }
+                else
+                {
+                    //ds regular case (i must be positive)
+                    uNeighborCellIndex = i;
+                }
+
+                //ds interact with all neighbor particles
+                for( unsigned int w = m_arrCellIndexRange[uNeighborCellIndex].first; w < m_arrCellIndexRange[uNeighborCellIndex].second; ++w )
+                {
+                    cTotalForce += _getLennardJonesForce( m_vecParticles[v-1], m_vecParticles[w-1], p_dMinimumDistance, p_dPotentialDepth );
+                }
+
+                //ds if we got the total force calculate the resulting acceleration and save it to our array
+                arrNewAccelerations[v] = cTotalForce/m_vecParticles[v].m_dMass;
             }
         }
-
-        //ds if we got the total force calculate the resulting acceleration and save it to our array
-        arrNewAccelerations[u] = cTotalForce/m_arrParticles[u].m_dMass;
     }
 
     //ds for each particle we have to calculate the effect of the acceleration now
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds velocity-verlet for position
-        m_arrParticles[u].m_cPosition = m_arrParticles[u].m_cPosition + p_dTimeStep*m_arrParticles[u].m_cVelocity + 1/2*pow( p_dTimeStep, 2 )*m_arrParticles[u].m_cAcceleration;
+        m_vecParticles[u].m_cPosition = m_vecParticles[u].m_cPosition + p_dTimeStep*m_vecParticles[u].m_cVelocity + 1/2*pow( p_dTimeStep, 2 )*m_vecParticles[u].m_cAcceleration;
 
         //ds produce periodic boundary shifting - check each element: x,y,z
         for( unsigned int v = 0; v < 3; ++v )
         {
             //ds check if we are below the boundary
-            while( m_pairBoundaries.first > m_arrParticles[u].m_cPosition( v ) )
+            while( m_pairBoundaries.first > m_vecParticles[u].m_cPosition( v ) )
             {
                 //ds map the particle to the other boundary by shifting it up to the boundary
-                m_arrParticles[u].m_cPosition( v ) += m_dDomainSize;
+                m_vecParticles[u].m_cPosition( v ) += m_dDomainSize;
             }
 
             //ds check if we are above the boundary
-            while( m_pairBoundaries.second < m_arrParticles[u].m_cPosition ( v ) )
+            while( m_pairBoundaries.second < m_vecParticles[u].m_cPosition ( v ) )
             {
                 //ds map the particle to the other boundary by shifting it back to the boundary
-                m_arrParticles[u].m_cPosition( v ) -= m_dDomainSize;
+                m_vecParticles[u].m_cPosition( v ) -= m_dDomainSize;
             }
         }
 
         //ds velocity-verlet for velocity
-        m_arrParticles[u].m_cVelocity = m_arrParticles[u].m_cVelocity + p_dTimeStep/2*( arrNewAccelerations[u] + m_arrParticles[u].m_cAcceleration );
+        m_vecParticles[u].m_cVelocity = m_vecParticles[u].m_cVelocity + p_dTimeStep/2*( arrNewAccelerations[u] + m_vecParticles[u].m_cAcceleration );
 
         //ds update the acceleration
-        m_arrParticles[u].m_cAcceleration = arrNewAccelerations[u];
+        m_vecParticles[u].m_cAcceleration = arrNewAccelerations[u];
     }
 
     //ds deallocate the temporary accelerations array
-    delete[] arrNewAccelerations;*/
+    delete[] arrNewAccelerations;
+
+    //ds update our cell list structures
+    _updateCellList( );
 }
 
 void CCubicDomain::saveParticlesToStream( )
 {
-    /*ds format: X Y Z U V W
+    //ds format: X Y Z U V W
 
     //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
@@ -150,18 +186,18 @@ void CCubicDomain::saveParticlesToStream( )
         char chBuffer[256];
 
         //ds get the particle stream
-        std::snprintf( chBuffer, 100, "%f %f %f %f %f %f", m_arrParticles[u].m_cPosition( 0 ), m_arrParticles[u].m_cPosition( 1 ), m_arrParticles[u].m_cPosition( 2 ),
-                                            m_arrParticles[u].m_cVelocity( 0 ), m_arrParticles[u].m_cVelocity( 1 ), m_arrParticles[u].m_cVelocity( 2 ) );
+        std::snprintf( chBuffer, 100, "%f %f %f %f %f %f", m_vecParticles[u].m_cPosition( 0 ), m_vecParticles[u].m_cPosition( 1 ), m_vecParticles[u].m_cPosition( 2 ),
+                                                           m_vecParticles[u].m_cVelocity( 0 ), m_vecParticles[u].m_cVelocity( 1 ), m_vecParticles[u].m_cVelocity( 2 ) );
 
         //ds append the buffer to our string
         m_strParticleInformation += chBuffer;
         m_strParticleInformation += "\n";
-    }*/
+    }
 }
 
 void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, const double& p_dPotentialDepth )
 {
-    /*ds format: E X Y Z X Y Z X Y Z
+    //ds format: E X Y Z X Y Z X Y Z
 
     //ds get information - caution, memory gets allocated
     const NBody::CVector vecCenterOfMass    ( getCenterOfMass( ) );
@@ -179,12 +215,12 @@ void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, cons
 
     //ds append the buffer to our string
     m_strIntegralsInformation += chBuffer;
-    m_strIntegralsInformation += "\n";*/
+    m_strIntegralsInformation += "\n";
 }
 
 void CCubicDomain::writeParticlesToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps )
 {
-    /*ds ofstream object
+    //ds ofstream object
     std::ofstream ofsFile;
 
     //ds open the file for writing
@@ -198,12 +234,12 @@ void CCubicDomain::writeParticlesToFile( const std::string& p_strFilename, const
     }
 
     //ds close the file
-    ofsFile.close( );*/
+    ofsFile.close( );
 }
 
 void CCubicDomain::writeIntegralsToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps, const double& p_dTimeStepSize )
 {
-    /*ds ofstream object
+    //ds ofstream object
     std::ofstream ofsFile;
 
     //ds open the file for writing
@@ -217,7 +253,7 @@ void CCubicDomain::writeIntegralsToFile( const std::string& p_strFilename, const
     }
 
     //ds close the file
-    ofsFile.close( );*/
+    ofsFile.close( );
 }
 
 //ds accessors/helpers
@@ -226,20 +262,20 @@ double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const dou
     //ds total energy to accumulate
     double dTotalEnergy( 0.0 );
 
-    /*ds for each particle
+    //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the kinetic component
-        dTotalEnergy += m_arrParticles[u].m_dMass/2*pow( NBody::CVector::absoluteValue( m_arrParticles[u].m_cVelocity ), 2 );
+        dTotalEnergy += m_vecParticles[u].m_dMass/2*pow( NBody::CVector::absoluteValue( m_vecParticles[u].m_cVelocity ), 2 );
 
         //ds loop over all other particles (dont do the same particles twice)
         for( unsigned int v = u+1; v < m_uNumberOfParticles; ++v )
         {
 
             //ds add the potential component
-            dTotalEnergy += _getLennardJonesPotential( m_arrParticles[u], m_arrParticles[v], p_dMinimumDistance, p_dPotentialDepth );
+            dTotalEnergy += _getLennardJonesPotential( m_vecParticles[u], m_vecParticles[v], p_dMinimumDistance, p_dPotentialDepth );
         }
-    }*/
+    }
 
     return dTotalEnergy;
 }
@@ -249,21 +285,21 @@ CVector CCubicDomain::getCenterOfMass( ) const
     //ds center to find
     CVector cCenter;
 
-    /*ds total mass
+    //ds total mass
     double dMassTotal( 0.0 );
 
     //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the current relative mass
-        cCenter += m_arrParticles[u].m_dMass*m_arrParticles[u].m_cPosition;
+        cCenter += m_vecParticles[u].m_dMass*m_vecParticles[u].m_cPosition;
 
         //ds add the current mass
-        dMassTotal += m_arrParticles[u].m_dMass;
+        dMassTotal += m_vecParticles[u].m_dMass;
     }
 
     //ds divide by total mass
-    cCenter /= dMassTotal;*/
+    cCenter /= dMassTotal;
 
     return cCenter;
 }
@@ -273,12 +309,12 @@ CVector CCubicDomain::getAngularMomentum( ) const
     //ds momentum
     CVector cMomentum;
 
-    /*ds for each particle
+    //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the current momentum
-        cMomentum += NBody::CVector::crossProduct( m_arrParticles[u].m_cPosition, m_arrParticles[u].m_dMass*m_arrParticles[u].m_cVelocity );
-    }*/
+        cMomentum += NBody::CVector::crossProduct( m_vecParticles[u].m_cPosition, m_vecParticles[u].m_dMass*m_vecParticles[u].m_cVelocity );
+    }
 
     return cMomentum;
 }
@@ -288,12 +324,12 @@ CVector CCubicDomain::getLinearMomentum( ) const
     //ds momentum
     CVector cMomentum;
 
-    /*ds for each particle
+    //ds for each particle
     for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
     {
         //ds add the current momentum
-        cMomentum += m_arrParticles[u].m_dMass*m_arrParticles[u].m_cVelocity;
-    }*/
+        cMomentum += m_vecParticles[u].m_dMass*m_vecParticles[u].m_cVelocity;
+    }
 
     return cMomentum;
 }
@@ -308,38 +344,17 @@ double CCubicDomain::_getLennardJonesPotential( const CParticle& p_CParticle1,  
 
 CVector CCubicDomain::_getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
 {
-    //ds cutoff distance
-    const double dDistanceCutoff( 2.5*p_dMinimumDistance );
 
-    //ds force to calculate
-    CVector cForce;
+    CVector cRadius( p_CParticle2.m_cPosition( 0 ) - p_CParticle1.m_cPosition( 0 ),
+                     p_CParticle2.m_cPosition( 1 ) - p_CParticle1.m_cPosition( 1 ),
+                     p_CParticle2.m_cPosition( 2 ) - p_CParticle1.m_cPosition( 2 ) );
 
-    //ds we have to loop over the cubic boundary conditions
-    for( double dX = m_pairBoundaries.first; dX < m_pairBoundaries.second+1; ++dX )
-    {
-        for( double dY = m_pairBoundaries.first; dY < m_pairBoundaries.second+1; ++dY )
-        {
-            for( double dZ = m_pairBoundaries.first; dZ < m_pairBoundaries.second+1; ++dZ )
-            {
-                CVector cRadius( dX*m_dDomainSize + p_CParticle2.m_cPosition( 0 ) - p_CParticle1.m_cPosition( 0 ),
-                                 dY*m_dDomainSize + p_CParticle2.m_cPosition( 1 ) - p_CParticle1.m_cPosition( 1 ),
-                                 dZ*m_dDomainSize + p_CParticle2.m_cPosition( 2 ) - p_CParticle1.m_cPosition( 2 ) );
+    //ds get the current distance between 2 and 1
+    const double dDistanceAbsolute( NBody::CVector::absoluteValue( cRadius ) );
 
-                //ds get the current distance between 2 and 1
-                const double dDistanceAbsolute( NBody::CVector::absoluteValue( cRadius ) );
-
-                //ds if we are within the cutoff range (only smaller here to avoid double overhead for >=)
-                if( dDistanceCutoff > dDistanceAbsolute )
-                {
-                    //ds add the force
-                    cForce += -24*p_dPotentialDepth*( 2*pow( p_dMinimumDistance/dDistanceAbsolute, 12 ) - pow( p_dMinimumDistance/dDistanceAbsolute, 6  ) )
-                                                   *1/pow( dDistanceAbsolute, 2 )*cRadius;
-                }
-            }
-        }
-    }
-
-    return cForce;
+    //ds return the resulting force
+    return -24*p_dPotentialDepth*( 2*pow( p_dMinimumDistance/dDistanceAbsolute, 12 ) - pow( p_dMinimumDistance/dDistanceAbsolute, 6  ) )
+                                *1/pow( dDistanceAbsolute, 2 )*cRadius;
 }
 
 double CCubicDomain::_getUniformlyDistributedNumber( ) const
@@ -357,12 +372,79 @@ double CCubicDomain::_getNormallyDistributedNumber( ) const
     return sqrt( -2*log( dUniformNumber ) )*cos( 2*M_PI*dUniformNumber );
 }
 
-unsigned int CCubicDomain::_getCellIndex( const CParticle& p_CParticle ) const
+unsigned int CCubicDomain::_getCellIndex( const double& p_dX, const double& p_dY, const double& p_dZ ) const
 {
     //ds calculate the cell index and return it
-    return floor( ( p_CParticle.m_cPosition( 0 ) + m_dDomainSize/2 )/2*m_uNumberOfCells
-                                                 +( p_CParticle.m_cPosition( 1 ) + m_dDomainSize/2 )/2*m_uNumberOfCells*m_uNumberOfCells
-                                                 +( p_CParticle.m_cPosition( 2 ) + m_dDomainSize/2 )/2*m_uNumberOfCells*m_uNumberOfCells*m_uNumberOfCells );
+    return ( floor( ( p_dX + m_dDomainSize/2 )/2*m_uNumberOfCells )
+           + floor( ( p_dY + m_dDomainSize/2 )/2*m_uNumberOfCells )*m_uNumberOfCells
+           + floor( ( p_dZ + m_dDomainSize/2 )/2*m_uNumberOfCells )*m_uNumberOfCells*m_uNumberOfCells );
+}
+
+bool CCubicDomain::_isCurrentCellIndexSmaller( const CParticle& p_pcParticle1, const CParticle& p_pcParticle2 )
+{
+    return ( p_pcParticle1.m_uIndexCell < p_pcParticle2.m_uIndexCell );
+}
+
+void CCubicDomain::_updateCellIndexRange( )
+{
+    //ds check if index range is allocated
+    if( 0 != m_arrCellIndexRange )
+    {
+        //ds loop parameters: current cell index
+        unsigned int uCurrentCellIndex( m_vecParticles[0].m_uIndexCell );
+
+        //ds already save the first element (has to be the first since vecParticles is sorted by cell indexi)
+        m_arrCellIndexRange[uCurrentCellIndex].first = 1;
+
+        //ds loop over all particles/cells - shifted, index 0 means there is no particle
+        for( unsigned int u = 1; u < m_uNumberOfParticles+1; ++u )
+        {
+            //ds if we get the first mismatch or we're at the end
+            if( uCurrentCellIndex < m_vecParticles[u-1].m_uIndexCell || m_uNumberOfParticles == u )
+            {
+                //ds add the index before if its not the last
+                if( m_uNumberOfParticles-1 > u )
+                {
+                    //ds take the one before
+                    m_arrCellIndexRange[uCurrentCellIndex].second = u-1;
+                }
+                else
+                {
+                    //ds add the last
+                    m_arrCellIndexRange[uCurrentCellIndex].second = u;
+                }
+
+                //ds update cell indexi
+                uCurrentCellIndex  = m_vecParticles[u-1].m_uIndexCell;
+
+                //ds check limits
+                if( m_uMaximumCellIndex < uCurrentCellIndex )
+                {
+                    //ds TODO implement exceptions
+                    throw std::exception( );
+                }
+
+                //ds save the current index and go on
+                m_arrCellIndexRange[uCurrentCellIndex].first = u;
+            }
+        }
+    }
+}
+
+void CCubicDomain::_updateCellList( )
+{
+    //ds construct cell data
+    for( unsigned int u = 0; u < m_uNumberOfParticles; ++u )
+    {
+        //ds set the cell index of the current particle
+        m_vecParticles[u].m_uIndexCell = _getCellIndex( m_vecParticles[u].m_cPosition( 0 ), m_vecParticles[u].m_cPosition( 1 ), m_vecParticles[u].m_cPosition( 2 ) );
+    }
+
+    //ds sort the particles according to cell index
+    std::sort( m_vecParticles.begin( ), m_vecParticles.end( ), _isCurrentCellIndexSmaller );
+
+    //ds update the index range
+    _updateCellIndexRange( );
 }
 
 } //ds namespace NBody

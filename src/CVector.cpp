@@ -40,7 +40,7 @@ double& CVector::operator( )( const unsigned int& p_uIndex )
     //ds if an index greater 2 is required throw an exception
     else
     {
-        //ds if an index greater 2 is required throw an exception
+        //ds TODO implement exceptions
         throw std::exception( );
     }
 }

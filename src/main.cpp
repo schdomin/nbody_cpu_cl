@@ -11,16 +11,21 @@ int main( int argc, char** argv )
 
     //ds domain configuration
     const std::pair< double, double > pairBoundaries( -1.0, 1.0 );
+    const double dDomainWidth( labs( pairBoundaries.first ) + labs( pairBoundaries.second ) );
     const unsigned int uNumberOfParticles( 100 );
 
     //ds current simulation configuration
     const double dTimeStepSize( 0.0001 );
     const unsigned int uNumberOfTimeSteps( 5000 );
-    const double dMinimumDistance( 5/uNumberOfParticles ); //pow( 1.0/uNumberOfParticles, 1.0/3 ) ); <- causes massive accelerations
-    const double dPotentialDepth( 0.01 );
+    const double dMinimumDistance( 5.0/uNumberOfParticles ); //pow( 1.0/uNumberOfParticles, 1.0/3 ) ); //<- causes massive accelerations
+    const double dPotentialDepth( 1.0 );
+
+    //ds cell list information
+    const unsigned int uNumberOfCells1D( floor( dDomainWidth/( 2.5*dMinimumDistance ) ) );
+    const unsigned int uMaximumCellIndex( uNumberOfCells1D + pow( uNumberOfCells1D, 2 ) + pow( uNumberOfCells1D, 3 ) + 1 );
 
     //ds allocate a domain to work with specifying number of particles and timing
-    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance );
+    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance, uNumberOfCells1D, uMaximumCellIndex );
 
     //ds target kinetic energy
     const double dTargetKineticEnergy( 1000.0 );
@@ -30,14 +35,24 @@ int main( int argc, char** argv )
 
     std::cout << "--------CPU SETUP------------------------------------------------------------" << std::endl;
     std::cout << "  Number of particles: " << uNumberOfParticles << std::endl;
+    std::cout << "        Boundary (3D): [" << pairBoundaries.first << ", " << pairBoundaries.second << "]" << std::endl;
+    std::cout << "         Domain Width: " << dDomainWidth << std::endl;
+    std::cout << "     Minimum distance: " << dMinimumDistance << std::endl;
+    std::cout << "      Cutoff distance: " << 2.5*dMinimumDistance << std::endl;
+    std::cout << "      Potential depth: " << dPotentialDepth << std::endl;
     std::cout << "Target kinetic energy: " << dTargetKineticEnergy << std::endl;
-    std::cout << "  Number of timesteps: " << uNumberOfTimeSteps << std::endl;
+    std::cout << " Number of time steps: " << uNumberOfTimeSteps << std::endl;
+    std::cout << "       Time step size: " << dTimeStepSize << std::endl;
+    std::cout << "--------CELL LISTS-----------------------------------------------------------" << std::endl;
+    std::cout << " Number of cells 1D M: " << uNumberOfCells1D << std::endl;
+    std::cout << "   Maximum cell index: " << uMaximumCellIndex << std::endl;
+    std::cout << "-----------------------------------------------------------------------------" << std::endl;
 
     //ds information
     std::cout << "               Status:  0% done - current step: 0";
 
     //ds start simulation
-    for( unsigned int uCurrentTimeStep = 0; uCurrentTimeStep < uNumberOfTimeSteps; ++uCurrentTimeStep )
+    for( unsigned int uCurrentTimeStep = 1; uCurrentTimeStep < uNumberOfTimeSteps+1; ++uCurrentTimeStep )
     {
         //ds calculate percentage done
         const double dPercentageDone( 100.0*uCurrentTimeStep/uNumberOfTimeSteps );

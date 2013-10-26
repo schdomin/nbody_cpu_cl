@@ -20,7 +20,9 @@ public:
     //ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps
     CCubicDomain( const std::pair< double, double >& p_pairBoundaries,
                   const unsigned int& p_uNumberOfParticles,
-                  const double& p_dMinimumDistance );
+                  const double& p_dMinimumDistance,
+                  const unsigned int& p_uNumberOfCells,
+                  const unsigned int& p_uMaximumCellIndex );
 
     //ds default destructor
     ~CCubicDomain( );
@@ -50,6 +52,13 @@ private:
     //ds particle storage (contains cell id and particle id)
     std::vector< CParticle > m_vecParticles;
 
+public:
+
+    //ds support structure (does not grow dynamically, is of size N) and returns the start and end index of the current cell
+    std::pair< unsigned int, unsigned int > *m_arrCellIndexRange;
+
+private:
+
     //ds domain properties
     const std::pair< double, double > m_pairBoundaries;
     const double m_dDomainSize;
@@ -57,6 +66,8 @@ private:
 
     //ds cell list properties
     const unsigned int m_uNumberOfCells;
+    const unsigned int m_uMaximumCellIndex;
+    const unsigned int m_uMaximumNeighborCellIndexRange;
 
     //ds streams for offline data - needed for the movie and graphs
     std::string m_strParticleInformation;
@@ -87,7 +98,15 @@ private:
     CVector _getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
     double _getUniformlyDistributedNumber( ) const;
     double _getNormallyDistributedNumber( ) const;
-    unsigned int _getCellIndex( const CParticle& p_CParticle ) const;
+    unsigned int _getCellIndex( const double& p_dX, const double& p_dY, const double& p_dZ ) const;
+    void _updateCellIndexRange( );
+    void _updateCellList( );
+
+//ds statics
+private:
+
+    //ds needed for sorting
+    static bool _isCurrentCellIndexSmaller( const CParticle& p_pcParticle1, const CParticle& p_pcParticle2 );
 
 };
 
