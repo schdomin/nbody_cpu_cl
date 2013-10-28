@@ -1,5 +1,6 @@
 #include "CCubicDomain.h"
 #include <algorithm>      //ds std::sort
+#include <iostream>
 
 
 
@@ -200,6 +201,7 @@ void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, cons
     //ds format: E X Y Z X Y Z X Y Z
 
     //ds get information - caution, memory gets allocated
+    const double dTotalEnergy               ( getTotalEnergy( p_dMinimumDistance, p_dPotentialDepth ) );
     const NBody::CVector vecCenterOfMass    ( getCenterOfMass( ) );
     const NBody::CVector vecAngularMomentum ( getAngularMomentum( ) );
     const NBody::CVector vecLinearMomentum  ( getLinearMomentum( ) );
@@ -208,7 +210,7 @@ void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, cons
     char chBuffer[256];
 
     //ds get the integrals stream
-    std::snprintf( chBuffer, 256, "%f %f %f %f %f %f %f %f %f %f", getTotalEnergy( p_dMinimumDistance, p_dPotentialDepth ),
+    std::snprintf( chBuffer, 256, "%f %f %f %f %f %f %f %f %f %f", dTotalEnergy,
                                                                    vecCenterOfMass( 0 ), vecCenterOfMass( 1 ), vecCenterOfMass( 2 ),
                                                                    vecAngularMomentum( 0 ), vecAngularMomentum( 1 ), vecAngularMomentum( 2 ),
                                                                    vecLinearMomentum( 0 ), vecLinearMomentum( 1 ), vecLinearMomentum( 2 ) );
@@ -336,22 +338,42 @@ CVector CCubicDomain::getLinearMomentum( ) const
 //ds helpers
 double CCubicDomain::_getLennardJonesPotential( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
 {
-    //ds formula
-    return 4*p_dPotentialDepth*( pow( p_dMinimumDistance/NBody::CVector::absoluteValue( p_CParticle1.m_cPosition-p_CParticle2.m_cPosition ), 12 )
-                               - pow( p_dMinimumDistance/NBody::CVector::absoluteValue( p_CParticle1.m_cPosition-p_CParticle2.m_cPosition ), 6 ) );
-}
+    //ds cutoff distance
+    const double dDistanceCutoff( 2.5*p_dMinimumDistance );
 
-CVector CCubicDomain::_getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
-{
+    //ds potential to calculate - default 0
+    double dPotential( 0.0 );
 
-    CVector cRadius( p_CParticle2.m_cPosition( 0 ) - p_CParticle1.m_cPosition( 0 ),
-                     p_CParticle2.m_cPosition( 1 ) - p_CParticle1.m_cPosition( 1 ),
-                     p_CParticle2.m_cPosition( 2 ) - p_CParticle1.m_cPosition( 2 ) );
+    //ds get the distance between the particles
+    const CVector cRadius( p_CParticle2.m_cPosition( 0 ) - p_CParticle1.m_cPosition( 0 ),
+                           p_CParticle2.m_cPosition( 1 ) - p_CParticle1.m_cPosition( 1 ),
+                           p_CParticle2.m_cPosition( 2 ) - p_CParticle1.m_cPosition( 2 ) );
 
     //ds get the current distance between 2 and 1
     const double dDistanceAbsolute( NBody::CVector::absoluteValue( cRadius ) );
 
-    //ds return the resulting force
+    //ds if we are between the minimum distance and the cutoff range
+    if( p_dMinimumDistance < dDistanceAbsolute && dDistanceCutoff > dDistanceAbsolute )
+    {
+        //ds add the potential
+        dPotential = 4*p_dPotentialDepth*( pow( p_dMinimumDistance/dDistanceAbsolute, 12 )
+                                         - pow( p_dMinimumDistance/dDistanceAbsolute, 6 ) );
+    }
+
+    return dPotential;
+}
+
+CVector CCubicDomain::_getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
+{
+    //ds get the distance between the particles
+    const CVector cRadius( p_CParticle2.m_cPosition( 0 ) - p_CParticle1.m_cPosition( 0 ),
+                           p_CParticle2.m_cPosition( 1 ) - p_CParticle1.m_cPosition( 1 ),
+                           p_CParticle2.m_cPosition( 2 ) - p_CParticle1.m_cPosition( 2 ) );
+
+    //ds get the current distance between 2 and 1
+    const double dDistanceAbsolute( NBody::CVector::absoluteValue( cRadius ) );
+
+    //ds return the resulting force - no cutoff check here and no periodic boundaries calculation, our cell list takes care of that
     return -24*p_dPotentialDepth*( 2*pow( p_dMinimumDistance/dDistanceAbsolute, 12 ) - pow( p_dMinimumDistance/dDistanceAbsolute, 6  ) )
                                 *1/pow( dDistanceAbsolute, 2 )*cRadius;
 }
