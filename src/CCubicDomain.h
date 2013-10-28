@@ -61,7 +61,7 @@ private:
 
     //ds domain properties
     const std::pair< double, double > m_pairBoundaries;
-    const double m_dDomainSize;
+    const double m_dDomainWidth;
     const unsigned int m_uNumberOfParticles;
 
     //ds cell list properties

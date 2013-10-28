@@ -1,27 +1,25 @@
 #include "CCubicDomain.h"
 #include <algorithm>      //ds std::sort
-#include <iostream>
 
 
 
 namespace NBody
 {
 
-//ds ctor/dtor - ugly ctor required for the const attributes
-//ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps
+//ds default constructor requires environmental parameters: N number of bodies, dT time step, T number of time steps inclusive calculations (ugly but required for the const attributes)
 CCubicDomain::CCubicDomain( const std::pair< double, double >& p_pairBoundaries,
                             const unsigned int& p_uNumberOfParticles,
                             const double& p_dMinimumDistance,
                             const unsigned int& p_uNumberOfCells,
                             const unsigned int& p_uMaximumCellIndex ): m_pairBoundaries( p_pairBoundaries ),
-                                                                       m_dDomainSize( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
+                                                                       m_dDomainWidth( fabs( m_pairBoundaries.first ) + fabs( m_pairBoundaries.second ) ),
                                                                        m_uNumberOfParticles( p_uNumberOfParticles ),
                                                                        m_uNumberOfCells( p_uNumberOfCells ),
                                                                        m_uMaximumCellIndex( p_uMaximumCellIndex ),
                                                                        m_uMaximumNeighborCellIndexRange( _getCellIndex( m_pairBoundaries.second, m_pairBoundaries.second, m_pairBoundaries.second )
-                                                                                                        - _getCellIndex( ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
-                                                                                                                         ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
-                                                                                                                         ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ) ) ),
+                                                                                                       - _getCellIndex( ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
+                                                                                                                        ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ),
+                                                                                                                        ( m_pairBoundaries.second - 2.5*p_dMinimumDistance/3 ) ) ),
                                                                        m_strParticleInformation( "" ),
                                                                        m_strIntegralsInformation( "" )
 {
@@ -151,14 +149,14 @@ void CCubicDomain::updateParticlesVelocityVerlet( const double& p_dTimeStep, con
             while( m_pairBoundaries.first > m_vecParticles[u].m_cPosition( v ) )
             {
                 //ds map the particle to the other boundary by shifting it up to the boundary
-                m_vecParticles[u].m_cPosition( v ) += m_dDomainSize;
+                m_vecParticles[u].m_cPosition( v ) += m_dDomainWidth;
             }
 
             //ds check if we are above the boundary
             while( m_pairBoundaries.second < m_vecParticles[u].m_cPosition ( v ) )
             {
                 //ds map the particle to the other boundary by shifting it back to the boundary
-                m_vecParticles[u].m_cPosition( v ) -= m_dDomainSize;
+                m_vecParticles[u].m_cPosition( v ) -= m_dDomainWidth;
             }
         }
 
@@ -380,8 +378,8 @@ CVector CCubicDomain::_getLennardJonesForce( const CParticle& p_CParticle1,  con
 
 double CCubicDomain::_getUniformlyDistributedNumber( ) const
 {
-    //ds drand48 returns [0,1], we need [-1,1] -> therefore 2x[0,1] -> [0,2] -> -1 ->[0-1,2-1] = [-1,1]
-    return 2*drand48( )-1;
+    //ds drand48 returns [0,1], we need [-1,1] -> therefore 2x[0,1] -> [0,2] -> -1 ->[0-1,2-1] = [-1,1] (for domain size 2)
+    return ( m_dDomainWidth*drand48( ) - m_dDomainWidth/2 );
 }
 
 double CCubicDomain::_getNormallyDistributedNumber( ) const
@@ -389,16 +387,16 @@ double CCubicDomain::_getNormallyDistributedNumber( ) const
     //ds calculate the uniform number first [0,1]
     const double dUniformNumber( drand48( ) );
 
-    //ds return the normal one
+    //ds return the normal one (formula)
     return sqrt( -2*log( dUniformNumber ) )*cos( 2*M_PI*dUniformNumber );
 }
 
 unsigned int CCubicDomain::_getCellIndex( const double& p_dX, const double& p_dY, const double& p_dZ ) const
 {
     //ds calculate the cell index and return it
-    return ( floor( ( p_dX + m_dDomainSize/2 )/2*m_uNumberOfCells )
-           + floor( ( p_dY + m_dDomainSize/2 )/2*m_uNumberOfCells )*m_uNumberOfCells
-           + floor( ( p_dZ + m_dDomainSize/2 )/2*m_uNumberOfCells )*m_uNumberOfCells*m_uNumberOfCells );
+    return ( floor( ( p_dX + m_dDomainWidth/2 )/2*m_uNumberOfCells )
+           + floor( ( p_dY + m_dDomainWidth/2 )/2*m_uNumberOfCells )*m_uNumberOfCells
+           + floor( ( p_dZ + m_dDomainWidth/2 )/2*m_uNumberOfCells )*m_uNumberOfCells*m_uNumberOfCells );
 }
 
 bool CCubicDomain::_isCurrentCellIndexSmaller( const CParticle& p_pcParticle1, const CParticle& p_pcParticle2 )
