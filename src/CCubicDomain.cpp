@@ -271,7 +271,6 @@ double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const dou
         //ds loop over all other particles (dont do the same particles twice)
         for( unsigned int v = u+1; v < m_uNumberOfParticles; ++v )
         {
-
             //ds add the potential component
             dTotalEnergy += _getLennardJonesPotential( m_vecParticles[u], m_vecParticles[v], p_dMinimumDistance, p_dPotentialDepth );
         }

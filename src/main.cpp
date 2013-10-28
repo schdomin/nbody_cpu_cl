@@ -17,7 +17,7 @@ int main( int argc, char** argv )
     //ds current simulation configuration
     const double dTimeStepSize( 0.0001 );
     const unsigned int uNumberOfTimeSteps( 5000 );
-    const double dMinimumDistance( 5.0/uNumberOfParticles ); //pow( 1.0/uNumberOfParticles, 1.0/3 ) ); //<- causes massive accelerations
+    const double dMinimumDistance( pow( 1.0/uNumberOfParticles, 1.0/3 ) ); //<- causes massive accelerations
     const double dPotentialDepth( 1.0 );
 
     //ds cell list information
@@ -28,7 +28,7 @@ int main( int argc, char** argv )
     NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance, uNumberOfCells1D, uMaximumCellIndex );
 
     //ds target kinetic energy
-    const double dTargetKineticEnergy( 1000.0 );
+    const double dTargetKineticEnergy( 100.0 );
 
     //ds create particles uniformly from a normal distribution
     cDomain.createParticlesUniformFromNormalDistribution( dTargetKineticEnergy );
