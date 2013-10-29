@@ -52,12 +52,8 @@ private:
     //ds particle storage (contains cell id and particle id)
     std::vector< CParticle > m_vecParticles;
 
-public:
-
     //ds support structure (does not grow dynamically, is of size N) and returns the start and end index of the current cell
     std::pair< unsigned int, unsigned int > *m_arrCellIndexRange;
-
-private:
 
     //ds domain properties
     const std::pair< double, double > m_pairBoundaries;
@@ -83,17 +79,13 @@ public:
     void writeParticlesToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps );
     void writeIntegralsToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps, const double& p_dTimeStepSize );
 
-//ds accessors/helpers
-public:
-
-    double getTotalEnergy( const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
-    CVector getCenterOfMass( ) const;
-    CVector getAngularMomentum( ) const;
-    CVector getLinearMomentum( ) const;
-
 //ds helpers
 private:
 
+    double _getTotalEnergy( const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
+    CVector _getCenterOfMass( ) const;
+    CVector _getAngularMomentum( ) const;
+    CVector _getLinearMomentum( ) const;
     double _getLennardJonesPotential( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
     CVector _getLennardJonesForce( const CParticle& p_CParticle1,  const CParticle& p_CParticle2, const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const;
     double _getUniformlyDistributedNumber( ) const;
@@ -102,7 +94,7 @@ private:
     void _updateCellIndexRange( );
     void _updateCellList( );
 
-//ds statics
+//ds internal statics
 private:
 
     //ds needed for sorting

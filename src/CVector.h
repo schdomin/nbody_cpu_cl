@@ -1,8 +1,8 @@
 #ifndef CVECTOR_H_
 #define CVECTOR_H_
 
-#include <fstream>                 //ds << operator
-#include <math.h>                  //ds sqrt
+#include <fstream> //ds << operator
+#include <math.h>  //ds sqrt
 
 
 

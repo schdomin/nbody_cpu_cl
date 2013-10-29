@@ -6,34 +6,36 @@
 
 int main( int argc, char** argv )
 {
+    //ds check simple input arguments - CAUTION: the implementation expects real numbers, the simulation will be corrupted if invalid values are entered
+    if( 4 != argc )
+    {
+        //ds inform
+        std::cout << "usage: nbody_cpu_cl [Number of particles] [Number of time steps] [Target energy]" << std::endl;
+        return 0;
+    }
+
     //ds start timing
     Timer tmTimer; tmTimer.start( );
 
     //ds domain configuration
     const std::pair< double, double > pairBoundaries( -1.0, 1.0 );
-    const double dDomainWidth( labs( pairBoundaries.first ) + labs( pairBoundaries.second ) );
-    const unsigned int uNumberOfParticles( 100 );
+    const double dDomainWidth( fabs( pairBoundaries.first ) + fabs( pairBoundaries.second ) );
+    const unsigned int uNumberOfParticles( atoi( argv[1] ) );
 
     //ds current simulation configuration
     const double dTimeStepSize( 0.0001 );
-    const unsigned int uNumberOfTimeSteps( 5000 );
+    const unsigned int uNumberOfTimeSteps( atoi( argv[2] ) );
     const double dMinimumDistance( pow( 1.0/uNumberOfParticles, 1.0/3 ) );
     const double dPotentialDepth( 1.0 );
 
     //ds target kinetic energy
-    const double dTargetKineticEnergy( 1000.0 );
+    const double dTargetKineticEnergy( atol( argv[3] ) );
 
     //ds cell list information
     const unsigned int uNumberOfCells1D( floor( dDomainWidth/( 2.5*dMinimumDistance ) ) );
     const unsigned int uMaximumCellIndex( uNumberOfCells1D + pow( uNumberOfCells1D, 2 ) + pow( uNumberOfCells1D, 3 ) + 1 );
 
-    //ds allocate a domain to work with specifying number of particles and timing
-    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance, uNumberOfCells1D, uMaximumCellIndex );
-
-    //ds create particles uniformly from a normal distribution
-    cDomain.createParticlesUniformFromNormalDistribution( dTargetKineticEnergy );
-
-    std::cout << "--------CPU SETUP------------------------------------------------------------" << std::endl;
+    std::cout << "------- CPU SETUP -----------------------------------------------------------" << std::endl;
     std::cout << "  Number of particles: " << uNumberOfParticles << std::endl;
     std::cout << "        Boundary (3D): [" << pairBoundaries.first << ", " << pairBoundaries.second << "]" << std::endl;
     std::cout << "         Domain Width: " << dDomainWidth << std::endl;
@@ -43,10 +45,16 @@ int main( int argc, char** argv )
     std::cout << "Target kinetic energy: " << dTargetKineticEnergy << std::endl;
     std::cout << " Number of time steps: " << uNumberOfTimeSteps << std::endl;
     std::cout << "       Time step size: " << dTimeStepSize << std::endl;
-    std::cout << "--------CELL LISTS-----------------------------------------------------------" << std::endl;
+    std::cout << "------- CELL LISTS ----------------------------------------------------------" << std::endl;
     std::cout << " Number of cells 1D M: " << uNumberOfCells1D << std::endl;
     std::cout << "   Maximum cell index: " << uMaximumCellIndex << std::endl;
     std::cout << "-----------------------------------------------------------------------------" << std::endl;
+
+    //ds allocate a domain to work with specifying number of particles and timing
+    NBody::CCubicDomain cDomain( pairBoundaries, uNumberOfParticles, dMinimumDistance, uNumberOfCells1D, uMaximumCellIndex );
+
+    //ds create particles uniformly from a normal distribution
+    cDomain.createParticlesUniformFromNormalDistribution( dTargetKineticEnergy );
 
     //ds information
     std::cout << "               Status:  0% done - current step: 0";

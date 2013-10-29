@@ -199,10 +199,10 @@ void CCubicDomain::saveIntegralsToStream( const double& p_dMinimumDistance, cons
     //ds format: E X Y Z X Y Z X Y Z
 
     //ds get information - caution, memory gets allocated
-    const double dTotalEnergy               ( getTotalEnergy( p_dMinimumDistance, p_dPotentialDepth ) );
-    const NBody::CVector vecCenterOfMass    ( getCenterOfMass( ) );
-    const NBody::CVector vecAngularMomentum ( getAngularMomentum( ) );
-    const NBody::CVector vecLinearMomentum  ( getLinearMomentum( ) );
+    const double dTotalEnergy               ( _getTotalEnergy( p_dMinimumDistance, p_dPotentialDepth ) );
+    const NBody::CVector vecCenterOfMass    ( _getCenterOfMass( ) );
+    const NBody::CVector vecAngularMomentum ( _getAngularMomentum( ) );
+    const NBody::CVector vecLinearMomentum  ( _getLinearMomentum( ) );
 
     //ds buffer for snprintf
     char chBuffer[256];
@@ -257,7 +257,7 @@ void CCubicDomain::writeIntegralsToFile( const std::string& p_strFilename, const
 }
 
 //ds accessors/helpers
-double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
+double CCubicDomain::_getTotalEnergy( const double& p_dMinimumDistance, const double& p_dPotentialDepth ) const
 {
     //ds total energy to accumulate
     double dTotalEnergy( 0.0 );
@@ -279,7 +279,7 @@ double CCubicDomain::getTotalEnergy( const double& p_dMinimumDistance, const dou
     return dTotalEnergy;
 }
 
-CVector CCubicDomain::getCenterOfMass( ) const
+CVector CCubicDomain::_getCenterOfMass( ) const
 {
     //ds center to find
     CVector cCenter;
@@ -303,7 +303,7 @@ CVector CCubicDomain::getCenterOfMass( ) const
     return cCenter;
 }
 
-CVector CCubicDomain::getAngularMomentum( ) const
+CVector CCubicDomain::_getAngularMomentum( ) const
 {
     //ds momentum
     CVector cMomentum;
@@ -318,7 +318,7 @@ CVector CCubicDomain::getAngularMomentum( ) const
     return cMomentum;
 }
 
-CVector CCubicDomain::getLinearMomentum( ) const
+CVector CCubicDomain::_getLinearMomentum( ) const
 {
     //ds momentum
     CVector cMomentum;
